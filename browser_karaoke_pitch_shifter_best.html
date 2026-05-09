@@ -88,10 +88,10 @@
       align-items:center;
     }
     .popover{
-      position:absolute;
-      left:50%;
-      top:calc(100% + 10px);
-      transform:translateX(-50%);
+      display:none !important;
+    }
+    .help-popover{
+      position:fixed;
       min-width:240px;
       max-width:320px;
       padding:12px 13px;
@@ -102,14 +102,17 @@
       box-shadow:var(--shadow);
       font-size:.88rem;
       line-height:1.45;
-      z-index:20;
-      display:none;
+      z-index:2147483647;
+      pointer-events:none;
+      opacity:0;
+      visibility:hidden;
+      transform:translateY(0);
     }
-    .popover::before{
+    .help-popover::before{
       content:"";
       position:absolute;
       top:-6px;
-      left:24px;
+      left:var(--arrow-left, 24px);
       transform:rotate(45deg);
       width:12px;
       height:12px;
@@ -117,7 +120,9 @@
       border-left:1px solid var(--line);
       border-top:1px solid var(--line);
     }
-    .help-wrap.open .popover{
+    .help-popover.open{
+      opacity:1;
+      visibility:visible;
       display:block;
     }
     input[type=range],input[type=number],select,button{font:inherit}
@@ -352,22 +357,72 @@
       applyTheme(saved || (prefersLight ? 'light' : 'dark'));
     };
 
+    const helpPopover = document.createElement('div');
+    helpPopover.className = 'help-popover';
+    document.body.appendChild(helpPopover);
+
+    let activeHelpTrigger = null;
+
     const closeAllPopovers = () => {
+      activeHelpTrigger = null;
+      helpPopover.classList.remove('open');
+      helpPopover.style.left = '';
+      helpPopover.style.top = '';
+      helpPopover.style.maxWidth = '';
+      helpPopover.style.visibility = 'hidden';
+      helpPopover.textContent = '';
       document.querySelectorAll('.help-wrap.open').forEach(el => el.classList.remove('open'));
+    };
+
+    const positionPopover = (trigger) => {
+      if (!trigger) return;
+
+      const pad = 12;
+      const gap = 10;
+      const rect = trigger.getBoundingClientRect();
+
+      helpPopover.textContent = trigger.dataset.help || '';
+      helpPopover.style.display = 'block';
+      helpPopover.style.visibility = 'hidden';
+      helpPopover.style.left = '0px';
+      helpPopover.style.top = '0px';
+      helpPopover.style.maxWidth = `${Math.min(320, window.innerWidth - pad * 2)}px`;
+
+      const bubbleRect = helpPopover.getBoundingClientRect();
+      const bubbleWidth = bubbleRect.width || 240;
+      const bubbleHeight = bubbleRect.height || 0;
+      const centerX = rect.left + rect.width / 2;
+      let left = centerX - bubbleWidth / 2;
+      left = Math.max(pad, Math.min(window.innerWidth - pad - bubbleWidth, left));
+
+      const belowTop = rect.bottom + gap;
+      const aboveTop = rect.top - gap - bubbleHeight;
+      const fitsBelow = belowTop + bubbleHeight <= window.innerHeight - pad;
+      const top = fitsBelow ? belowTop : Math.max(pad, aboveTop);
+
+      let arrowLeft = centerX - left;
+      arrowLeft = Math.max(18, Math.min(bubbleWidth - 18, arrowLeft));
+      helpPopover.style.setProperty('--arrow-left', `${arrowLeft}px`);
+      helpPopover.style.left = `${left}px`;
+      helpPopover.style.top = `${top}px`;
+      helpPopover.style.visibility = 'visible';
+      helpPopover.classList.add('open');
     };
 
     const setupPopovers = () => {
       document.querySelectorAll('.help-wrap').forEach(wrap => {
         const trigger = wrap.querySelector('.help');
         const popover = wrap.querySelector('.popover');
-        if (!trigger || !popover) return;
-        popover.textContent = trigger.dataset.help || '';
+        if (!trigger) return;
+        if (popover) popover.textContent = trigger.dataset.help || '';
 
         const toggle = (force) => {
-          const shouldOpen = typeof force === 'boolean' ? force : !wrap.classList.contains('open');
+          const shouldOpen = typeof force === 'boolean' ? force : activeHelpTrigger !== trigger;
           closeAllPopovers();
           if (shouldOpen) {
             wrap.classList.add('open');
+            activeHelpTrigger = trigger;
+            positionPopover(trigger);
           }
         };
 
@@ -386,10 +441,18 @@
         });
       });
 
-      document.addEventListener('click', closeAllPopovers);
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.help-wrap') && !e.target.closest('.help-popover')) {
+          closeAllPopovers();
+        }
+      });
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeAllPopovers();
       });
+      window.addEventListener('resize', () => {
+        if (activeHelpTrigger) positionPopover(activeHelpTrigger);
+      });
+      window.addEventListener('scroll', closeAllPopovers, true);
     };
 
     const log = (msg) => {
