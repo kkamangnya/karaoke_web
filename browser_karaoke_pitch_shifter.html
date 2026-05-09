@@ -1,0 +1,1198 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>브라우저 노래방 음정 변경기</title>
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+  <style>
+    :root {
+      --bg0: #08111f;
+      --bg1: #101b31;
+      --panel: rgba(255, 255, 255, 0.08);
+      --line: rgba(255, 255, 255, 0.14);
+      --text: #eef4ff;
+      --muted: #aeb9d6;
+      --accent: #6ee7ff;
+      --accent2: #9b8cff;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      --radius: 20px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(110, 231, 255, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(155, 140, 255, 0.16), transparent 30%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+    }
+    .wrap {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 28px 18px 36px;
+    }
+    .hero { margin-bottom: 18px; }
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+    }
+    .hero p {
+      margin: 0;
+      max-width: 980px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 18px;
+      align-items: start;
+    }
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: linear-gradient(180deg, var(--panel), rgba(255,255,255,0.05));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+    .panel { padding: 18px; }
+    .section-title {
+      margin: 0 0 14px;
+      font-size: 1.02rem;
+      letter-spacing: -0.02em;
+    }
+    .dropzone {
+      display: grid;
+      place-items: center;
+      min-height: 180px;
+      border: 1.5px dashed rgba(255,255,255,0.18);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      transition: 180ms ease;
+      text-align: center;
+      padding: 18px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(110, 231, 255, 0.09);
+      transform: translateY(-1px);
+    }
+    .dropzone strong {
+      display: block;
+      font-size: 1.05rem;
+      margin-bottom: 8px;
+    }
+    .dropzone span, .tiny, .body p, .note { color: var(--muted); line-height: 1.65; }
+    input[type="file"] { display: none; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .meta .item {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+    .meta .k {
+      display: block;
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-bottom: 4px;
+    }
+    .meta .v {
+      display: block;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .control {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .control label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .control label .value {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    input[type="range"], input[type="number"], select, button { font: inherit; }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    input[type="number"], select {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      padding: 12px 14px;
+      outline: none;
+    }
+    input[type="number"]:focus, select:focus {
+      border-color: rgba(110,231,255,0.65);
+      box-shadow: 0 0 0 3px rgba(110,231,255,0.12);
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    button, a.download {
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 16px;
+      color: white;
+      background: linear-gradient(135deg, #2b9cff, #6e7eff);
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(43, 156, 255, 0.22);
+    }
+    button.secondary, a.secondary {
+      background: rgba(255,255,255,0.08);
+      box-shadow: none;
+      border: 1px solid var(--line);
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .status {
+      display: grid;
+      gap: 8px;
+      padding: 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+    .status-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+    .progress {
+      height: 14px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .progress > div {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 180ms ease;
+    }
+    audio {
+      width: 100%;
+      margin-top: 10px;
+    }
+    .log {
+      margin-top: 14px;
+      min-height: 120px;
+      max-height: 220px;
+      overflow: auto;
+      white-space: pre-wrap;
+      background: rgba(0,0,0,0.16);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 14px;
+      color: #d7e2ff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+    details {
+      margin-top: 18px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.05);
+      overflow: hidden;
+    }
+    details summary {
+      list-style: none;
+      padding: 14px 16px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    details summary::-webkit-details-marker { display: none; }
+    details .body { padding: 0 16px 16px; }
+    code {
+      padding: 0.15em 0.35em;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.08);
+      color: #dce9ff;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 10px;
+      margin-right: 8px;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>브라우저 노래방 음정 변경기</h1>
+      <p>
+        업로드한 <code>mp3</code> 또는 <code>wav</code> 파일을 외부 서버 없이 브라우저 내부에서 직접 처리합니다.
+        음정은 반음 단위로 바꾸고, 재생 속도는 유지합니다. 출력은 WAV 또는 MP3로 다운로드할 수 있습니다.
+      </p>
+    </div>
+
+    <div class="grid">
+      <section class="card panel">
+        <h2 class="section-title">입력과 조작</h2>
+        <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="오디오 파일 드롭존">
+          <div>
+            <strong>파일을 여기에 끌어다 놓거나 클릭해서 선택하세요</strong>
+            <span>지원 형식: MP3, WAV<br />클라이언트에서만 디코딩하고 처리합니다.</span>
+          </div>
+        </div>
+        <input id="fileInput" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav,audio/*" />
+
+        <div class="meta">
+          <div class="item"><span class="k">파일명</span><span id="fileName" class="v">없음</span></div>
+          <div class="item"><span class="k">길이</span><span id="fileDuration" class="v">-</span></div>
+          <div class="item"><span class="k">채널</span><span id="fileChannels" class="v">-</span></div>
+          <div class="item"><span class="k">샘플레이트</span><span id="fileSampleRate" class="v">-</span></div>
+        </div>
+
+        <div class="toolbar">
+          <span class="badge" id="detectedKeyBadge">자동 분석 키: -</span>
+          <span class="badge" id="mp3SupportBadge">MP3 인코더: 확인 중</span>
+        </div>
+
+        <div class="two-col" style="margin-top: 14px;">
+          <div class="control">
+            <label for="semitoneRange">피치 이동 <span class="value"><span id="semitoneValue">0</span> semitone</span></label>
+            <input id="semitoneRange" type="range" min="-12" max="12" step="1" value="0" />
+          </div>
+          <div class="control">
+            <label for="semitoneNumber">직접 입력</label>
+            <input id="semitoneNumber" type="number" min="-12" max="12" step="1" value="0" />
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="control">
+            <label for="algorithmSelect">알고리즘</label>
+            <select id="algorithmSelect">
+              <option value="soundtouch" selected>고음질 (SoundTouchJS)</option>
+              <option value="granular">Granular</option>
+            </select>
+          </div>
+          <div class="control">
+            <label for="targetKeySelect">목표 키</label>
+            <select id="targetKeySelect">
+              <option value="">선택 안 함</option>
+              <option value="C">C</option>
+              <option value="C#">C# / Db</option>
+              <option value="D">D</option>
+              <option value="D#">D# / Eb</option>
+              <option value="E">E</option>
+              <option value="F">F</option>
+              <option value="F#">F# / Gb</option>
+              <option value="G">G</option>
+              <option value="G#">G# / Ab</option>
+              <option value="A">A</option>
+              <option value="A#">A# / Bb</option>
+              <option value="B">B</option>
+              <option value="Cm">Cm</option>
+              <option value="C#m">C#m / Dbm</option>
+              <option value="Dm">Dm</option>
+              <option value="D#m">D#m / Ebm</option>
+              <option value="Em">Em</option>
+              <option value="Fm">Fm</option>
+              <option value="F#m">F#m / Gbm</option>
+              <option value="Gm">Gm</option>
+              <option value="G#m">G#m / Abm</option>
+              <option value="Am">Am</option>
+              <option value="A#m">A#m / Bbm</option>
+              <option value="Bm">Bm</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="control">
+            <label for="fftSize">FFT 크기</label>
+            <select id="fftSize">
+              <option value="1024">1024</option>
+              <option value="2048" selected>2048</option>
+              <option value="4096">4096</option>
+            </select>
+          </div>
+          <div class="control">
+            <label for="hopSize">Hop size</label>
+            <select id="hopSize">
+              <option value="256" selected>256</option>
+              <option value="512">512</option>
+              <option value="1024">1024</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="control">
+            <label for="outputFormat">출력 형식</label>
+            <select id="outputFormat">
+              <option value="wav" selected>WAV</option>
+              <option value="mp3">MP3</option>
+            </select>
+          </div>
+          <div class="control">
+            <label for="mp3Bitrate">MP3 비트레이트</label>
+            <select id="mp3Bitrate">
+              <option value="128">128 kbps</option>
+              <option value="192">192 kbps</option>
+              <option value="256">256 kbps</option>
+              <option value="320" selected>320 kbps</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button id="processBtn" disabled>음정 변경</button>
+          <button id="resetBtn" class="secondary" disabled>초기화</button>
+          <button id="useDetectedBtn" class="secondary" disabled>자동 분석 키 적용</button>
+          <a id="downloadBtn" class="download secondary" href="#" download="shifted.wav" style="pointer-events:none; opacity:.45;">결과 다운로드</a>
+        </div>
+
+        <div style="margin-top:16px;">
+          <h2 class="section-title" style="margin-bottom:8px;">원본 재생</h2>
+          <audio id="originalPlayer" controls></audio>
+        </div>
+
+        <div style="margin-top:14px;">
+          <h2 class="section-title" style="margin-bottom:8px;">결과 재생</h2>
+          <audio id="resultPlayer" controls></audio>
+        </div>
+      </section>
+
+      <aside class="card panel">
+        <h2 class="section-title">처리 상태</h2>
+        <div class="status">
+          <div class="status-head">
+            <span id="statusText">대기 중</span>
+            <span id="progressText">0%</span>
+          </div>
+          <div class="progress" aria-label="진행률">
+            <div id="progressBar"></div>
+          </div>
+          <div class="tiny">
+            큰 파일은 시간이 걸릴 수 있습니다. 브라우저 탭을 닫지 말고 기다려 주세요.
+          </div>
+        </div>
+
+        <div class="log" id="log"></div>
+
+        <details open>
+          <summary>구현 원리</summary>
+          <div class="body">
+            <p>1. 파일은 <code>AudioContext.decodeAudioData()</code>로 디코딩해서 PCM 샘플로 바꿉니다.</p>
+            <p>2. 기본은 <code>SoundTouchJS</code> 기반 고음질 시간-음정 변환을 사용하고, 대안으로 granular overlap-add를 제공합니다.</p>
+            <p>3. 음정을 먼저 바꾸고, 그 뒤에 길이를 원본과 맞춰 재조합해서 재생 속도를 유지합니다.</p>
+            <p>4. 결과는 WAV 또는 MP3 Blob으로 만들어 브라우저에서 바로 재생하고 다운로드합니다.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>사용 팁</summary>
+          <div class="body">
+            <p>작은 음정 이동은 자연스럽고, 큰 이동은 아티팩트가 들릴 수 있습니다.</p>
+            <p>Granular는 더 거칠지만 종종 보컬/반주 분리된 느낌을 줄 수 있고, Phase vocoder는 더 안정적입니다.</p>
+            <p>MP3 다운로드는 <code>lamejs</code> 인코더가 로드될 때 활성화됩니다. 실패하면 WAV로 저장해 주세요.</p>
+          </div>
+        </details>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const els = {
+        fileInput: document.getElementById('fileInput'),
+        dropzone: document.getElementById('dropzone'),
+        processBtn: document.getElementById('processBtn'),
+        resetBtn: document.getElementById('resetBtn'),
+        useDetectedBtn: document.getElementById('useDetectedBtn'),
+        downloadBtn: document.getElementById('downloadBtn'),
+        originalPlayer: document.getElementById('originalPlayer'),
+        resultPlayer: document.getElementById('resultPlayer'),
+        semitoneRange: document.getElementById('semitoneRange'),
+        semitoneNumber: document.getElementById('semitoneNumber'),
+        semitoneValue: document.getElementById('semitoneValue'),
+        algorithmSelect: document.getElementById('algorithmSelect'),
+        targetKeySelect: document.getElementById('targetKeySelect'),
+        fftSizeSelect: document.getElementById('fftSize'),
+        hopSizeSelect: document.getElementById('hopSize'),
+        outputFormat: document.getElementById('outputFormat'),
+        mp3Bitrate: document.getElementById('mp3Bitrate'),
+        fileName: document.getElementById('fileName'),
+        fileDuration: document.getElementById('fileDuration'),
+        fileChannels: document.getElementById('fileChannels'),
+        fileSampleRate: document.getElementById('fileSampleRate'),
+        detectedKeyBadge: document.getElementById('detectedKeyBadge'),
+        mp3SupportBadge: document.getElementById('mp3SupportBadge'),
+        progressBar: document.getElementById('progressBar'),
+        progressText: document.getElementById('progressText'),
+        statusText: document.getElementById('statusText'),
+        log: document.getElementById('log')
+      };
+
+      const KEY_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+      const MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+      const MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+
+      const state = {
+        ctx: null,
+        sourceBuffer: null,
+        sourceUrl: null,
+        resultUrl: null,
+        detectedKey: null,
+        detectedConfidence: 0
+      };
+
+      function log(msg) {
+        const time = new Date().toLocaleTimeString();
+        els.log.textContent += `[${time}] ${msg}\n`;
+        els.log.scrollTop = els.log.scrollHeight;
+      }
+
+      function setStatus(msg, progress) {
+        els.statusText.textContent = msg;
+        if (typeof progress === 'number') {
+          const p = Math.max(0, Math.min(100, progress));
+          els.progressBar.style.width = p + '%';
+          els.progressText.textContent = p.toFixed(0) + '%';
+        }
+      }
+
+      function updateSemitoneUI(value) {
+        const v = Math.max(-12, Math.min(12, Number(value) || 0));
+        els.semitoneRange.value = String(v);
+        els.semitoneNumber.value = String(v);
+        els.semitoneValue.textContent = String(v);
+      }
+
+      function ensureContext() {
+        if (!state.ctx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          state.ctx = new AC();
+        }
+        return state.ctx.resume().then(() => state.ctx);
+      }
+
+      function clearResult() {
+        if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
+        state.resultUrl = null;
+        els.resultPlayer.removeAttribute('src');
+        els.resultPlayer.load();
+        els.downloadBtn.href = '#';
+        els.downloadBtn.style.pointerEvents = 'none';
+        els.downloadBtn.style.opacity = '.45';
+      }
+
+      function revokeSourceUrl() {
+        if (state.sourceUrl) URL.revokeObjectURL(state.sourceUrl);
+        state.sourceUrl = null;
+      }
+
+      function formatDuration(seconds) {
+        if (!Number.isFinite(seconds)) return '-';
+        if (seconds < 60) return seconds.toFixed(2) + 's';
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+      }
+
+      function normalizeSignal(signal) {
+        let peak = 0;
+        for (let i = 0; i < signal.length; i++) {
+          const a = Math.abs(signal[i]);
+          if (a > peak) peak = a;
+        }
+        if (peak < 1e-8) return new Float32Array(signal);
+        const out = new Float32Array(signal.length);
+        const gain = 0.98 / peak;
+        for (let i = 0; i < signal.length; i++) out[i] = signal[i] * gain;
+        return out;
+      }
+
+      function hannWindow(size) {
+        const w = new Float32Array(size);
+        for (let i = 0; i < size; i++) {
+          w[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (size - 1));
+        }
+        return w;
+      }
+
+      function linearResample(input, outputLength) {
+        const out = new Float32Array(Math.max(1, outputLength));
+        if (input.length === 0) return out;
+        if (out.length === 1) {
+          out[0] = input[0];
+          return out;
+        }
+        const scale = (input.length - 1) / (out.length - 1);
+        for (let i = 0; i < out.length; i++) {
+          const pos = i * scale;
+          const i0 = Math.floor(pos);
+          const i1 = Math.min(input.length - 1, i0 + 1);
+          const frac = pos - i0;
+          out[i] = input[i0] * (1 - frac) + input[i1] * frac;
+        }
+        return out;
+      }
+
+      function fft(re, im, inverse = false) {
+        const n = re.length;
+        for (let i = 1, j = 0; i < n; i++) {
+          let bit = n >> 1;
+          for (; j & bit; bit >>= 1) j ^= bit;
+          j ^= bit;
+          if (i < j) {
+            [re[i], re[j]] = [re[j], re[i]];
+            [im[i], im[j]] = [im[j], im[i]];
+          }
+        }
+        for (let len = 2; len <= n; len <<= 1) {
+          const ang = 2 * Math.PI / len * (inverse ? -1 : 1);
+          const wlenCos = Math.cos(ang);
+          const wlenSin = Math.sin(ang);
+          for (let i = 0; i < n; i += len) {
+            let wCos = 1;
+            let wSin = 0;
+            for (let j = 0; j < len / 2; j++) {
+              const uRe = re[i + j];
+              const uIm = im[i + j];
+              const vRe = re[i + j + len / 2] * wCos - im[i + j + len / 2] * wSin;
+              const vIm = re[i + j + len / 2] * wSin + im[i + j + len / 2] * wCos;
+              re[i + j] = uRe + vRe;
+              im[i + j] = uIm + vIm;
+              re[i + j + len / 2] = uRe - vRe;
+              im[i + j + len / 2] = uIm - vIm;
+              const nextCos = wCos * wlenCos - wSin * wlenSin;
+              const nextSin = wCos * wlenSin + wSin * wlenCos;
+              wCos = nextCos;
+              wSin = nextSin;
+            }
+          }
+        }
+        if (inverse) {
+          for (let i = 0; i < n; i++) {
+            re[i] /= n;
+            im[i] /= n;
+          }
+        }
+      }
+
+      function bufferToMono(buffer) {
+        const channels = buffer.numberOfChannels;
+        const length = buffer.length;
+        const mono = new Float32Array(length);
+        for (let c = 0; c < channels; c++) {
+          const data = buffer.getChannelData(c);
+          for (let i = 0; i < length; i++) mono[i] += data[i] / channels;
+        }
+        return mono;
+      }
+
+      function cloneChannelData(buffer) {
+        const out = [];
+        for (let c = 0; c < buffer.numberOfChannels; c++) {
+          out.push(new Float32Array(buffer.getChannelData(c)));
+        }
+        return out;
+      }
+
+      async function decodeFile(file) {
+        const ctx = await ensureContext();
+        const arrayBuffer = await file.arrayBuffer();
+        return await ctx.decodeAudioData(arrayBuffer.slice(0));
+      }
+
+      function setSourcePreview(file) {
+        revokeSourceUrl();
+        state.sourceUrl = URL.createObjectURL(file);
+        els.originalPlayer.src = state.sourceUrl;
+      }
+
+      async function loadFile(file) {
+        if (!file) return;
+        setStatus('파일 디코딩 중', 5);
+        log(`파일 선택: ${file.name}`);
+        setSourcePreview(file);
+        clearResult();
+        els.processBtn.disabled = true;
+        els.resetBtn.disabled = true;
+        els.useDetectedBtn.disabled = true;
+        try {
+          const buffer = await decodeFile(file);
+          state.sourceBuffer = buffer;
+          els.fileName.textContent = file.name;
+          els.fileDuration.textContent = formatDuration(buffer.duration);
+          els.fileChannels.textContent = String(buffer.numberOfChannels);
+          els.fileSampleRate.textContent = buffer.sampleRate + ' Hz';
+          els.processBtn.disabled = false;
+          els.resetBtn.disabled = false;
+          setStatus('자동 키 분석 중', 20);
+          const analysis = await detectKey(buffer, Number(els.fftSizeSelect.value), Number(els.hopSizeSelect.value));
+          state.detectedKey = analysis.key;
+          state.detectedConfidence = analysis.confidence;
+          els.detectedKeyBadge.textContent = `자동 분석 키: ${analysis.key} (${analysis.confidence.toFixed(2)})`;
+          els.useDetectedBtn.disabled = false;
+          setStatus('준비 완료', 100);
+          log(`디코딩 완료: ${buffer.numberOfChannels}채널, ${buffer.sampleRate}Hz, ${buffer.duration.toFixed(2)}초`);
+          log(`자동 분석 키: ${analysis.key} / confidence=${analysis.confidence.toFixed(3)}`);
+        } catch (err) {
+          console.error(err);
+          setStatus('디코딩 실패', 0);
+          log('오류: ' + err.message);
+          alert('오디오 디코딩에 실패했습니다. 브라우저가 해당 형식을 지원하는지 확인해 주세요.');
+        }
+      }
+
+      function parseKeyToken(key) {
+        let token = (key || '').trim().replace('♯', '#').replace('♭', 'b');
+        let mode = 'major';
+        if (token.endsWith('m') && token.length > 1) {
+          mode = 'minor';
+          token = token.slice(0, -1);
+        }
+        const aliases = {
+          'Db': 1, 'C#': 1,
+          'Eb': 3, 'D#': 3,
+          'Gb': 6, 'F#': 6,
+          'Ab': 8, 'G#': 8,
+          'Bb': 10, 'A#': 10
+        };
+        const root = aliases[token] !== undefined ? aliases[token] : KEY_NAMES.indexOf(token.toUpperCase());
+        if (root < 0) throw new Error('Unsupported key: ' + key);
+        return { root, mode };
+      }
+
+      function keyToSemitones(sourceKey, targetKey) {
+        const a = parseKeyToken(sourceKey);
+        const b = parseKeyToken(targetKey);
+        const diff = b.root - a.root;
+        return ((diff + 6) % 12) - 6;
+      }
+
+      function detectKeyFromBuffer(buffer, fftSize, hopSize, onProgress) {
+        const channels = cloneChannelData(buffer);
+        const signal = bufferToMono(buffer);
+        const window = hannWindow(fftSize);
+        const bins = fftSize / 2 + 1;
+        const chroma = new Float32Array(12);
+        const frames = Math.max(1, Math.floor(Math.max(1, signal.length - fftSize) / hopSize) + 1);
+        const re = new Float32Array(fftSize);
+        const im = new Float32Array(fftSize);
+
+        for (let frame = 0; frame < frames; frame++) {
+          re.fill(0); im.fill(0);
+          const offset = frame * hopSize;
+          for (let i = 0; i < fftSize; i++) {
+            re[i] = (signal[offset + i] || 0) * window[i];
+          }
+          fft(re, im, false);
+          for (let k = 1; k < bins; k++) {
+            const freq = (k * buffer.sampleRate) / fftSize;
+            if (freq < 20) continue;
+            const midi = 69 + 12 * Math.log2(freq / 440);
+            const pc = ((Math.round(midi) % 12) + 12) % 12;
+            const mag = re[k] * re[k] + im[k] * im[k];
+            chroma[pc] += mag;
+          }
+          if (onProgress && frame % 24 === 0) onProgress(frame / frames);
+        }
+
+        let best = { score: -Infinity, key: 'C', confidence: 0 };
+        const chromaNorm = Math.hypot(...chroma) || 1;
+        for (let root = 0; root < 12; root++) {
+          const major = MAJOR_PROFILE.map((v, i) => MAJOR_PROFILE[(i - root + 12) % 12]);
+          const minor = MINOR_PROFILE.map((v, i) => MINOR_PROFILE[(i - root + 12) % 12]);
+          const scoreMajor = cosineSimilarity(chroma, major);
+          const scoreMinor = cosineSimilarity(chroma, minor);
+          if (scoreMajor > best.score) best = { score: scoreMajor, key: KEY_NAMES[root], confidence: scoreMajor };
+          if (scoreMinor > best.score) best = { score: scoreMinor, key: KEY_NAMES[root] + 'm', confidence: scoreMinor };
+        }
+        return best;
+      }
+
+      function cosineSimilarity(a, b) {
+        let dot = 0, na = 0, nb = 0;
+        for (let i = 0; i < 12; i++) {
+          dot += a[i] * b[i];
+          na += a[i] * a[i];
+          nb += b[i] * b[i];
+        }
+        return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-9);
+      }
+
+      async function detectKey(buffer, fftSize, hopSize) {
+        setStatus('자동 키 분석 중', 10);
+        const key = detectKeyFromBuffer(buffer, fftSize, hopSize, p => setStatus('자동 키 분석 중', 10 + p * 20));
+        return key;
+      }
+
+      function unwrapPhases(phases) {
+        const frames = phases.length;
+        const bins = phases[0].length;
+        const out = new Array(frames);
+        out[0] = new Float32Array(phases[0]);
+        for (let f = 1; f < frames; f++) {
+          const arr = new Float32Array(bins);
+          const prev = out[f - 1];
+          const cur = phases[f];
+          const prevPhase = phases[f - 1];
+          for (let k = 0; k < bins; k++) {
+            let delta = cur[k] - prevPhase[k];
+            delta = ((delta + Math.PI) % (2 * Math.PI)) - Math.PI;
+            arr[k] = prev[k] + delta;
+          }
+          out[f] = arr;
+        }
+        return out;
+      }
+
+      async function analyzeSpectrum(signal, fftSize, hopSize, onProgress) {
+        const window = hannWindow(fftSize);
+        const frames = Math.max(1, Math.floor(Math.max(1, signal.length - fftSize) / hopSize) + 1);
+        const bins = fftSize / 2 + 1;
+        const mags = new Array(frames);
+        const phases = new Array(frames);
+        const re = new Float32Array(fftSize);
+        const im = new Float32Array(fftSize);
+
+        for (let frame = 0; frame < frames; frame++) {
+          re.fill(0); im.fill(0);
+          const offset = frame * hopSize;
+          for (let i = 0; i < fftSize; i++) re[i] = (signal[offset + i] || 0) * window[i];
+          fft(re, im, false);
+          const mag = new Float32Array(bins);
+          const ph = new Float32Array(bins);
+          for (let k = 0; k < bins; k++) {
+            mag[k] = Math.hypot(re[k], im[k]);
+            ph[k] = Math.atan2(im[k], re[k]);
+          }
+          mags[frame] = mag;
+          phases[frame] = ph;
+          if (onProgress && frame % 24 === 0) onProgress(frame / frames);
+          if (frame % 16 === 0) await new Promise(requestAnimationFrame);
+        }
+        return { mags, phases, frames, bins, window };
+      }
+
+      async function spectralStretch(signal, stretchFactor, fftSize, hopSize, onProgress) {
+        const { mags, phases, frames, bins, window } = await analyzeSpectrum(signal, fftSize, hopSize, onProgress);
+        const unwrapped = unwrapPhases(phases);
+        const outFrames = Math.max(1, Math.round(frames * stretchFactor));
+        const outLen = (outFrames - 1) * hopSize + fftSize;
+        const out = new Float32Array(outLen);
+        const norm = new Float32Array(outLen);
+        const re = new Float32Array(fftSize);
+        const im = new Float32Array(fftSize);
+
+        for (let oframe = 0; oframe < outFrames; oframe++) {
+          const srcPos = oframe / stretchFactor;
+          const i0 = Math.max(0, Math.min(frames - 1, Math.floor(srcPos)));
+          const i1 = Math.min(frames - 1, i0 + 1);
+          const a = srcPos - i0;
+
+          re.fill(0); im.fill(0);
+          for (let k = 0; k < bins; k++) {
+            const mag = mags[i0][k] * (1 - a) + mags[i1][k] * a;
+            const ph = unwrapped[i0][k] * (1 - a) + unwrapped[i1][k] * a;
+            const rr = mag * Math.cos(ph);
+            const ii = mag * Math.sin(ph);
+            re[k] = rr;
+            im[k] = ii;
+            if (k > 0 && k < bins - 1) {
+              re[fftSize - k] = rr;
+              im[fftSize - k] = -ii;
+            }
+          }
+
+          fft(re, im, true);
+          const offset = oframe * hopSize;
+          for (let n = 0; n < fftSize; n++) {
+            const idx = offset + n;
+            if (idx >= outLen) break;
+            const sample = re[n] * window[n];
+            out[idx] += sample;
+            norm[idx] += window[n] * window[n];
+          }
+
+          if (onProgress && oframe % 16 === 0) onProgress(oframe / outFrames);
+          if (oframe % 8 === 0) await new Promise(requestAnimationFrame);
+        }
+
+        for (let i = 0; i < out.length; i++) {
+          if (norm[i] > 1e-8) out[i] /= norm[i];
+        }
+        return out;
+      }
+
+      async function granularTimeStretch(signal, stretchFactor, grainSize, hopSize, onProgress) {
+        const outLen = Math.max(1, Math.round(signal.length * stretchFactor));
+        const out = new Float32Array(outLen);
+        const norm = new Float32Array(outLen);
+        const window = hannWindow(grainSize);
+        const outHop = Math.max(1, hopSize);
+        const srcHop = outHop / Math.max(0.0001, stretchFactor);
+        let grain = 0;
+
+        for (let outPos = 0, srcPos = 0; outPos < outLen; outPos += outHop, srcPos += srcHop, grain++) {
+          const center = Math.round(srcPos);
+          const start = center - Math.floor(grainSize / 2);
+          for (let n = 0; n < grainSize; n++) {
+            const idx = outPos + n;
+            if (idx >= outLen) break;
+            const sample = signal[start + n] || 0;
+            const w = window[n];
+            out[idx] += sample * w;
+            norm[idx] += w * w;
+          }
+          if (onProgress && grain % 16 === 0) onProgress(Math.min(1, outPos / outLen));
+          if (grain % 8 === 0) await new Promise(requestAnimationFrame);
+        }
+
+        for (let i = 0; i < out.length; i++) {
+          if (norm[i] > 1e-8) out[i] /= norm[i];
+        }
+        return out;
+      }
+
+      async function pitchShiftPhaseVocoder(signal, semitones, fftSize, hopSize, onProgress) {
+        const factor = Math.pow(2, semitones / 12);
+        const stretchFactor = 1 / factor;
+        const stretched = await spectralStretch(signal, stretchFactor, fftSize, hopSize, onProgress);
+        return linearResample(stretched, signal.length);
+      }
+
+      async function pitchShiftGranular(signal, semitones, fftSize, hopSize, onProgress) {
+        const factor = Math.pow(2, semitones / 12);
+        const pitchChanged = linearResample(signal, Math.max(1, Math.round(signal.length / factor)));
+        const stretched = await granularTimeStretch(pitchChanged, factor, Math.max(512, fftSize), hopSize, onProgress);
+        return linearResample(stretched, signal.length);
+      }
+
+      function channelDataToWavBlob(buffer) {
+        const channels = buffer.numberOfChannels;
+        const sampleRate = buffer.sampleRate;
+        const length = buffer.length;
+        const bytesPerSample = 2;
+        const blockAlign = channels * bytesPerSample;
+        const dataSize = length * blockAlign;
+        const ab = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(ab);
+        const chData = Array.from({ length: channels }, (_, c) => buffer.getChannelData(c));
+        let offset = 0;
+
+        function writeString(str) {
+          for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+          offset += str.length;
+        }
+
+        writeString('RIFF');
+        view.setUint32(offset, 36 + dataSize, true); offset += 4;
+        writeString('WAVE');
+        writeString('fmt ');
+        view.setUint32(offset, 16, true); offset += 4;
+        view.setUint16(offset, 1, true); offset += 2;
+        view.setUint16(offset, channels, true); offset += 2;
+        view.setUint32(offset, sampleRate, true); offset += 4;
+        view.setUint32(offset, sampleRate * blockAlign, true); offset += 4;
+        view.setUint16(offset, blockAlign, true); offset += 2;
+        view.setUint16(offset, 16, true); offset += 2;
+        writeString('data');
+        view.setUint32(offset, dataSize, true); offset += 4;
+
+        for (let i = 0; i < length; i++) {
+          for (let c = 0; c < channels; c++) {
+            let sample = chData[c][i] || 0;
+            sample = Math.max(-1, Math.min(1, sample));
+            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+            offset += 2;
+          }
+        }
+        return new Blob([ab], { type: 'audio/wav' });
+      }
+
+      function floatToInt16(float32) {
+        const out = new Int16Array(float32.length);
+        for (let i = 0; i < float32.length; i++) {
+          const s = Math.max(-1, Math.min(1, float32[i]));
+          out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        return out;
+      }
+
+      function mp3EncoderAvailable() {
+        return !!(window.lamejs && window.lamejs.Mp3Encoder);
+      }
+
+      function updateMp3Badge() {
+        if (mp3EncoderAvailable()) {
+          els.mp3SupportBadge.textContent = 'MP3 인코더: 사용 가능';
+        } else {
+          els.mp3SupportBadge.textContent = 'MP3 인코더: 미탑재, WAV로 대체';
+        }
+      }
+
+      function audioBufferToMp3Blob(buffer, kbps) {
+        if (!mp3EncoderAvailable()) throw new Error('MP3 encoder is not available in this browser.');
+        const Mp3Encoder = window.lamejs.Mp3Encoder;
+        const channels = buffer.numberOfChannels;
+        const sampleRate = buffer.sampleRate;
+        const mp3Encoder = new Mp3Encoder(channels, sampleRate, kbps);
+        const left = floatToInt16(buffer.getChannelData(0));
+        const right = channels > 1 ? floatToInt16(buffer.getChannelData(1)) : null;
+        const blockSize = 1152;
+        const chunks = [];
+
+        for (let i = 0; i < left.length; i += blockSize) {
+          const l = left.subarray(i, i + blockSize);
+          let mp3buf;
+          if (channels > 1) {
+            const r = right.subarray(i, i + blockSize);
+            mp3buf = mp3Encoder.encodeBuffer(l, r);
+          } else {
+            mp3buf = mp3Encoder.encodeBuffer(l);
+          }
+          if (mp3buf.length > 0) chunks.push(new Uint8Array(mp3buf));
+        }
+        const end = mp3Encoder.flush();
+        if (end.length > 0) chunks.push(new Uint8Array(end));
+        return new Blob(chunks, { type: 'audio/mpeg' });
+      }
+
+      async function processChannel(signal, semitones, algorithm, fftSize, hopSize, onProgress) {
+        if (Math.abs(semitones) < 1e-9) return new Float32Array(signal);
+        if (algorithm === 'granular') {
+          return await pitchShiftGranular(signal, semitones, fftSize, hopSize, onProgress);
+        }
+        return await pitchShiftPhaseVocoder(signal, semitones, fftSize, hopSize, onProgress);
+      }
+
+      async function processAudioBuffer(buffer, semitones, algorithm, fftSize, hopSize) {
+        const ctx = await ensureContext();
+        const output = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+        const channels = cloneChannelData(buffer);
+        for (let c = 0; c < channels.length; c++) {
+          setStatus(`채널 ${c + 1}/${channels.length} 처리 중`, Math.round((c / channels.length) * 100));
+          const processed = await processChannel(
+            channels[c],
+            semitones,
+            algorithm,
+            fftSize,
+            hopSize,
+            p => setStatus(`채널 ${c + 1}/${channels.length} 처리 중`, Math.round((c / channels.length + p / channels.length) * 100))
+          );
+          output.getChannelData(c).set(normalizeSignal(processed));
+          await new Promise(requestAnimationFrame);
+        }
+        return output;
+      }
+
+      function parseSemitoneValue() {
+        return Number(els.semitoneRange.value || els.semitoneNumber.value || 0);
+      }
+
+      function resolveSemitone() {
+        const targetKey = els.targetKeySelect.value.trim();
+        if (targetKey && state.detectedKey) {
+          try {
+            const semitones = keyToSemitones(state.detectedKey, targetKey);
+            log(`목표 키 적용: ${state.detectedKey} -> ${targetKey} (${semitones >= 0 ? '+' : ''}${semitones} semitone)`);
+            return semitones;
+          } catch (err) {
+            log('키 변환 실패: ' + err.message);
+          }
+        }
+        return parseSemitoneValue();
+      }
+
+      async function runProcessing() {
+        if (!state.sourceBuffer) {
+          alert('먼저 오디오 파일을 업로드해 주세요.');
+          return;
+        }
+        const semitones = resolveSemitone();
+        const algorithm = els.algorithmSelect.value;
+        const fftSize = Number(els.fftSizeSelect.value);
+        const hopSize = Number(els.hopSizeSelect.value);
+        const outputFormat = els.outputFormat.value;
+        const kbps = Number(els.mp3Bitrate.value);
+
+        els.processBtn.disabled = true;
+        els.resetBtn.disabled = true;
+        setStatus('처리 시작', 0);
+        log(`피치 변경 시작: ${semitones >= 0 ? '+' : ''}${semitones} semitone / ${algorithm}`);
+
+        try {
+          const processed = await processAudioBuffer(state.sourceBuffer, semitones, algorithm, fftSize, hopSize);
+          setStatus('출력 인코딩 중', 96);
+          let blob;
+          let ext;
+          let mime;
+
+          if (outputFormat === 'mp3') {
+            if (mp3EncoderAvailable()) {
+              blob = audioBufferToMp3Blob(processed, kbps);
+              ext = 'mp3';
+              mime = 'audio/mpeg';
+              log(`MP3 인코딩 완료 (${kbps} kbps)`);
+            } else {
+              log('MP3 인코더가 없어 WAV로 대체합니다.');
+              blob = channelDataToWavBlob(processed);
+              ext = 'wav';
+              mime = 'audio/wav';
+            }
+          } else {
+            blob = channelDataToWavBlob(processed);
+            ext = 'wav';
+            mime = 'audio/wav';
+          }
+
+          if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
+          state.resultUrl = URL.createObjectURL(blob);
+          els.resultPlayer.src = state.resultUrl;
+          els.downloadBtn.href = state.resultUrl;
+          els.downloadBtn.download = `shifted_${Math.abs(semitones)}st.${ext}`;
+          els.downloadBtn.style.pointerEvents = 'auto';
+          els.downloadBtn.style.opacity = '1';
+          setStatus('완료', 100);
+          log(`처리 완료, 결과 준비됨 (${mime})`);
+        } catch (err) {
+          console.error(err);
+          setStatus('오류 발생', 0);
+          log('오류: ' + err.message);
+          alert('처리 중 오류가 발생했습니다. 콘솔 로그를 확인해 주세요.');
+        } finally {
+          els.processBtn.disabled = false;
+          els.resetBtn.disabled = false;
+        }
+      }
+
+      function resetAll() {
+        state.sourceBuffer = null;
+        state.detectedKey = null;
+        state.detectedConfidence = 0;
+        els.fileInput.value = '';
+        els.fileName.textContent = '없음';
+        els.fileDuration.textContent = '-';
+        els.fileChannels.textContent = '-';
+        els.fileSampleRate.textContent = '-';
+        els.detectedKeyBadge.textContent = '자동 분석 키: -';
+        els.originalPlayer.removeAttribute('src');
+        els.originalPlayer.load();
+        els.log.textContent = '';
+        clearResult();
+        setStatus('대기 중', 0);
+        els.processBtn.disabled = true;
+        els.resetBtn.disabled = true;
+        els.useDetectedBtn.disabled = true;
+        log('초기화 완료');
+      }
+
+      function bindDnD() {
+        els.dropzone.addEventListener('click', () => els.fileInput.click());
+        els.dropzone.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            els.fileInput.click();
+          }
+        });
+        els.dropzone.addEventListener('dragover', e => {
+          e.preventDefault();
+          els.dropzone.classList.add('dragover');
+        });
+        els.dropzone.addEventListener('dragleave', () => els.dropzone.classList.remove('dragover'));
+        els.dropzone.addEventListener('drop', e => {
+          e.preventDefault();
+          els.dropzone.classList.remove('dragover');
+          const file = e.dataTransfer.files && e.dataTransfer.files[0];
+          if (file) loadFile(file);
+        });
+      }
+
+      function init() {
+        updateSemitoneUI(0);
+        updateMp3Badge();
+        setStatus('대기 중', 0);
+        log('브라우저 전용 노래방 음정 변경기가 준비되었습니다.');
+        log('파일을 올리면 자동 키 분석이 실행됩니다.');
+        bindDnD();
+
+        els.semitoneRange.addEventListener('input', () => updateSemitoneUI(els.semitoneRange.value));
+        els.semitoneNumber.addEventListener('input', () => updateSemitoneUI(els.semitoneNumber.value));
+        els.fileInput.addEventListener('change', () => loadFile(els.fileInput.files && els.fileInput.files[0]));
+        els.processBtn.addEventListener('click', runProcessing);
+        els.resetBtn.addEventListener('click', resetAll);
+        els.useDetectedBtn.addEventListener('click', () => {
+          if (state.detectedKey) {
+            els.targetKeySelect.value = state.detectedKey;
+            log(`자동 분석 키를 목표 키로 설정: ${state.detectedKey}`);
+          }
+        });
+        els.targetKeySelect.addEventListener('change', () => {
+          if (els.targetKeySelect.value) {
+            log(`목표 키 선택: ${els.targetKeySelect.value}`);
+          }
+        });
+        els.outputFormat.addEventListener('change', updateMp3Badge);
+        setInterval(updateMp3Badge, 1500);
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
